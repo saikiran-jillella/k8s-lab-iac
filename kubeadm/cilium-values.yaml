@@ -1,0 +1,5 @@
+routingMode: native
+kubeProxyReplacement: true
+ipv4NativeRoutingCIDR: "10.244.0.0/16"
+k8sServiceHost: "192.168.0.120"
+k8sServicePort: 6443
