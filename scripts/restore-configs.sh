@@ -1,4 +1,6 @@
 #!/bin/bash
+source libvirt/vm-specs.env
+
 set -e
 
 if [ -z "$1" ]; then

@@ -1,16 +1,55 @@
 #!/bin/bash
 set -eo pipefail
 
-IMAGE_URL="https://cloud-images.ubuntu.com/releases/26.04/release/ubuntu-26.04-server-cloudimg-amd64.img"
+source libvirt/vm-specs.env
+
+# Helper function to convert human-readable sizes to raw MiB for virt-install
+normalize_ram_to_mib() {
+    local input=$1
+    input=${input^^} # Convert to uppercase
+    local val=${input//[!0-9]/} # Extract numbers
+    
+    if [[ $input == *GIB ]] || [[ $input == *G ]]; then
+        echo $(( val * 1024 ))
+    elif [[ $input == *GB ]]; then
+        # 1 GB = 1000^3 bytes, output needs to be in MiB (1024^2 bytes)
+        echo $(( (val * 1000000000) / 1048576 ))
+    elif [[ $input == *MIB ]] || [[ $input == *M ]]; then
+        echo $val
+    elif [[ $input == *MB ]]; then
+        # 1 MB = 1000^2 bytes
+        local mib=$(( (val * 1000000) / 1048576 ))
+        echo $(( mib > 0 ? mib : 1 )) # Prevent 0 MiB allocation
+    else
+        echo "$input" # Assume it's already a raw number in MiB
+    fi
+}
+
+# Helper function to convert human-readable sizes to raw bytes for qemu-img
+normalize_disk_size() {
+    local input=$1
+    input=${input^^} # Convert to uppercase
+    local val=${input//[!0-9]/} # Extract numbers
+    
+    if [[ $input == *GIB ]] || [[ $input == *G ]]; then
+        echo $(( val * 1073741824 )) # 1024^3
+    elif [[ $input == *GB ]]; then
+        echo $(( val * 1000000000 )) # 1000^3
+    elif [[ $input == *MIB ]] || [[ $input == *M ]]; then
+        echo $(( val * 1048576 ))    # 1024^2
+    elif [[ $input == *MB ]]; then
+        echo $(( val * 1000000 ))    # 1000^2
+    else
+        # If no suffix is provided (e.g., just '40'), assume GiB for backward compatibility
+        echo $(( val * 1073741824 ))
+    fi
+}
+
 IMAGE_FILE="/var/lib/libvirt/images/ubuntu-26.04-server-cloudimg-amd64.img"
 VM_DIR="/var/lib/libvirt/images"
 
-# Nodes and resources
-NODES=("cp1" "cp2" "cp3" "worker1" "worker2")
-VCPUS=2
-RAM=4096
-DISK_SIZE="40G"
-BRIDGE="br0"
+# Extract node names from associative array
+NODES=("${!CLUSTER_NODES[@]}")
 
 if ! command -v cloud-localds &> /dev/null; then
     echo "cloud-localds could not be found. Please install cloud-utils or cloud-image-utils."
@@ -34,25 +73,76 @@ for node in "${NODES[@]}"; do
     DISK_PATH="$VM_DIR/$node.qcow2"
     SEED_PATH="$VM_DIR/$node-seed.iso"
 
+    if [ -f "$DISK_PATH" ]; then
+        echo "VM $node already exists at $DISK_PATH. Skipping..."
+        echo "WARNING: If you changed configuration in vm-specs.env for $node, you MUST run destroy-vms.sh first!"
+        continue
+    fi
+    
+    # Determine Role Defaults based on node prefix
+    if [[ "$node" == cp* ]]; then
+        ROLE_VCPU=${CP_VCPUS:-2}
+        ROLE_RAM=${CP_RAM:-2048}
+        ROLE_DISK=${CP_DISK:-"20G"}
+    elif [[ "$node" == worker* ]]; then
+        ROLE_VCPU=${WORKER_VCPUS:-4}
+        ROLE_RAM=${WORKER_RAM:-4096}
+        ROLE_DISK=${WORKER_DISK:-"40G"}
+    else
+        # Safety fallback
+        ROLE_VCPU=2
+        ROLE_RAM=2048
+        ROLE_DISK="20G"
+    fi
+
+    # Resolve per-node overrides or fall back to role defaults
+    NODE_VCPU=${NODE_VCPUS[$node]:-$ROLE_VCPU}
+    NODE_RAM_SIZE=$(normalize_ram_to_mib "${NODE_RAM[$node]:-$ROLE_RAM}")
+    NODE_DISK_SIZE=$(normalize_disk_size "${NODE_DISK[$node]:-$ROLE_DISK}")
+    NODE_IP=${CLUSTER_NODES[$node]}
+
     # Create the VM disk from the base image
     sudo cp "$IMAGE_FILE" "$DISK_PATH"
-    sudo qemu-img resize "$DISK_PATH" $DISK_SIZE
+    sudo qemu-img resize "$DISK_PATH" "$NODE_DISK_SIZE"
+
+    # Generate Node-Specific Configs from Templates
+    mkdir -p .generated
+    
+    # Inject Credentials and Hostname into Cloud-Init
+    sed -e "s/{{HOSTNAME}}/$node/g" \
+        -e "s/{{CLUSTER_USER}}/${CLUSTER_USER:-k8sadmin}/g" \
+        -e "s/{{CLUSTER_PASS}}/${CLUSTER_PASS:-k8sadmin}/g" \
+        -e "s/{{GITHUB_SSH_USER}}/${GITHUB_SSH_USER:-}/g" \
+        templates/cloud-init.yaml.template > .generated/cloud-init-$node.yaml
+        
+    # Inject IP into Netplan
+    sed "s/{{IP_ADDRESS}}/$NODE_IP/g" templates/netplan.yaml.template > .generated/netplan-$node.yaml
+
+    # Generate Kubernetes manifests if this is cp1
+    if [[ "$node" == "cp1" ]]; then
+        sed -e "s/{{CP1_IP}}/$NODE_IP/g" \
+            -e "s/{{CLUSTER_VIP}}/${CLUSTER_VIP:-$CLUSTER_VIP}/g" \
+            templates/kubeadm-init.yaml.template > .generated/kubeadm-init.yaml
+        sed -e "s/{{CLUSTER_VIP}}/${CLUSTER_VIP:-$CLUSTER_VIP}/g" \
+            templates/kube-vip.yaml.template > .generated/kube-vip.yaml
+        sed -e "s/{{CLUSTER_VIP}}/${CLUSTER_VIP:-$CLUSTER_VIP}/g" \
+            templates/cilium-values.yaml.template > .generated/cilium-values.yaml
+    fi
 
     # Create the cloud-init seed ISO
-    # We use user-data and network-config
     echo "Generating cloud-init seed for $node..."
-    sudo cloud-localds --network-config netplan/$node.yaml "$SEED_PATH" cloud-init/$node.yaml
+    sudo cloud-localds --network-config .generated/netplan-$node.yaml "$SEED_PATH" .generated/cloud-init-$node.yaml
 
     # Create the VM using virt-install
-    echo "Creating VM $node with virt-install..."
+    echo "Creating VM $node with virt-install (VCPUS: $NODE_VCPU, RAM: ${NODE_RAM_SIZE}MB, Disk: $NODE_DISK_SIZE)..."
     sudo virt-install \
         --name "$node" \
-        --memory $RAM \
-        --vcpus $VCPUS \
+        --memory "$NODE_RAM_SIZE" \
+        --vcpus "$NODE_VCPU" \
         --disk path="$DISK_PATH",device=disk,bus=virtio,format=qcow2 \
         --disk path="$SEED_PATH",device=cdrom \
-        --os-variant=ubuntu24.04 \
-        --network bridge=$BRIDGE,model=virtio \
+        --os-variant="$OS_VARIANT" \
+        --network "${NETWORK_CONFIG}",model=virtio \
         --import \
         --noautoconsole \
         --graphics none
@@ -60,4 +150,4 @@ for node in "${NODES[@]}"; do
     echo "$node provisioned successfully."
 done
 
-echo "All VMs created and started. They will take a few minutes to boot and run cloud-init."
+echo "All VMs created and started. Because we used the golden image, they will be ready in seconds."

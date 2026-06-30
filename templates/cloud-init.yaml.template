@@ -1,12 +1,25 @@
 #cloud-config
-hostname: cp3
+hostname: {{HOSTNAME}}
 manage_etc_hosts: true
 
 users:
-  - name: saikiran
+  - name: {{CLUSTER_USER}}
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin, sudo
     shell: /bin/bash
+    password: {{CLUSTER_PASS}}
+    lock_passwd: false
+    ssh_import_id:
+      - gh:{{GITHUB_SSH_USER}}
+ssh_pwauth: true
+
+chpasswd:
+  list: |
+    {{CLUSTER_USER}}:{{CLUSTER_PASS}}
+  expire: false
+    # Or inject SSH keys below
+    # ssh_authorized_keys:
+    #   - ssh-rsa AAAA...
 
 package_update: true
 package_upgrade: true
@@ -48,8 +61,8 @@ runcmd:
   - systemctl enable containerd
   # Install Kubernetes latest
   - mkdir -p -m 755 /etc/apt/keyrings
-  - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-  - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+  - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  - echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
   - apt-get update
   - apt-get install -y kubelet kubeadm kubectl
   - apt-mark hold kubelet kubeadm kubectl

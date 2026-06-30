@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-NODES=("cp1" "cp2" "cp3" "worker1" "worker2")
+source libvirt/vm-specs.env
+NODES=("${!CLUSTER_NODES[@]}")
 VM_DIR="/var/lib/libvirt/images"
 
 for node in "${NODES[@]}"; do

@@ -21,3 +21,21 @@
    cilium status
    kubectl -n kube-system logs -l k8s-app=cilium
    ```
+
+5. Inspecting failing Pods:
+   If a pod is stuck in `CrashLoopBackOff` or `Pending`, get detailed events:
+   ```bash
+   kubectl describe pod <pod-name> -n <namespace>
+   ```
+   To view the application logs:
+   ```bash
+   kubectl logs <pod-name> -n <namespace>
+   ```
+
+6. Inspecting Host Services (Kubelet or Containerd):
+   If a node is `NotReady`, SSH into the node and check the system logs:
+   ```bash
+   ssh $CLUSTER_USER@${CLUSTER_NODES[worker1]}
+   sudo journalctl -u kubelet -f
+   sudo journalctl -u containerd -f
+   ```

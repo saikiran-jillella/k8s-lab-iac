@@ -1,4 +1,6 @@
 #!/bin/bash
+source libvirt/vm-specs.env
+
 set -e
 
 BACKUP_DIR="backups/configs_$(date +%Y%m%d_%H%M%S)"

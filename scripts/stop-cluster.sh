@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-NODES=("cp1" "cp2" "cp3" "worker1" "worker2")
+source libvirt/vm-specs.env
+NODES=("${!CLUSTER_NODES[@]}")
 
 for node in "${NODES[@]}"; do
     echo "Shutting down $node..."
