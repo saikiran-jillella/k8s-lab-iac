@@ -48,10 +48,10 @@ To change the resource allocation or network mode, simply edit the variables in 
 
 ## Quick Start (1-Click Deploy)
 
-If you just want to build the entire cluster from scratch, simply run the master startup script. This will provision the VMs, inject SSH keys, bootstrap Kubernetes, and deploy the monitoring stack.
+If you just want to build the entire cluster from scratch, simply run the master build script. This will provision the VMs, inject SSH keys, bootstrap Kubernetes, and deploy the monitoring stack.
 
 ```bash
-./scripts/startup.sh
+./scripts/build-cluster.sh
 ```
 
 ---

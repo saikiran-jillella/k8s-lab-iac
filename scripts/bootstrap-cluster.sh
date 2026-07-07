@@ -52,9 +52,9 @@ echo "Generated CP join command: $CP_JOIN_CMD --control-plane --certificate-key 
 echo "Generated Worker join command: $CP_JOIN_CMD"
 
 # Write templates
-echo "#!/bin/bash" > kubeadm/join-template.sh
-echo "CP_JOIN_CMD=\"$CP_JOIN_CMD --control-plane --certificate-key $CERT_KEY\"" >> kubeadm/join-template.sh
-echo "WORKER_JOIN_CMD=\"$CP_JOIN_CMD\"" >> kubeadm/join-template.sh
+echo "#!/bin/bash" > .generated/join-template.sh
+echo "CP_JOIN_CMD=\"$CP_JOIN_CMD --control-plane --certificate-key $CERT_KEY\"" >> .generated/join-template.sh
+echo "WORKER_JOIN_CMD=\"$CP_JOIN_CMD\"" >> .generated/join-template.sh
 
 source libvirt/vm-specs.env
 
