@@ -1,15 +1,15 @@
 network:
   version: 2
   ethernets:
-    enp1s0:
+    default_interface:
+      match:
+        driver: virtio_net
       dhcp4: false
       dhcp6: false
       addresses:
-        - {{IP_ADDRESS}}/24
+        - {{IP_ADDRESS}}/{{CIDR_SUFFIX}}
       routes:
         - to: default
-          via: 192.168.0.1
+          via: {{GATEWAY_IP}}
       nameservers:
-        addresses:
-          - 1.1.1.1
-          - 8.8.8.8
+        addresses: [{{NAMESERVERS}}]

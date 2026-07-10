@@ -7,19 +7,20 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin, sudo
     shell: /bin/bash
-    password: {{CLUSTER_PASS}}
+    plain_text_passwd: {{CLUSTER_PASS}}
     lock_passwd: false
-    ssh_import_id:
-      - gh:{{GITHUB_SSH_USER}}
 ssh_pwauth: true
-
-chpasswd:
-  list: |
-    {{CLUSTER_USER}}:{{CLUSTER_PASS}}
-  expire: false
     # Or inject SSH keys below
     # ssh_authorized_keys:
     #   - ssh-rsa AAAA...
+
+bootcmd:
+  - [ sh, -c, "sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y needrestart || true" ]
+
+apt:
+  primary:
+    - arches: [default]
+      uri: http://in.archive.ubuntu.com/ubuntu/
 
 package_update: true
 package_upgrade: true

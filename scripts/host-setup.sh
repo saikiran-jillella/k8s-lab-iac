@@ -1,7 +1,11 @@
 #!/bin/bash
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
+
 source libvirt/vm-specs.env
 
-set -e
 
 echo "=== Kubernetes Lab Host Setup ==="
 echo "This script will install KVM/libvirt dependencies and configure your host."

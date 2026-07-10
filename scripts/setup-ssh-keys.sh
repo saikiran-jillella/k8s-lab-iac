@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
 
 source libvirt/vm-specs.env
 # CLUSTER_NODES associative array is now provided by the central config
@@ -7,28 +10,38 @@ source libvirt/vm-specs.env
 echo "=== Kubernetes Lab SSH Key Setup ==="
 echo "This script will push your SSH public key to all cluster nodes."
 
-# Prompt for the key to use
-DEFAULT_KEY="$HOME/.ssh/id_ed25519.pub"
-read -p "Enter path to your public SSH key [$DEFAULT_KEY]: " PUB_KEY
+# shellcheck source=scripts/lib/ssh-agent-setup.sh
+source "$(dirname "$0")/lib/ssh-agent-setup.sh"
 
-if [ -z "$PUB_KEY" ]; then
-    PUB_KEY="$DEFAULT_KEY"
-fi
-
-if [ ! -f "$PUB_KEY" ]; then
-    echo "Error: Public key not found at $PUB_KEY"
-    exit 1
-fi
+PUB_KEY="$LAB_KEY.pub"
 
 echo "Using key: $PUB_KEY"
 echo "You may be prompted for the node password ('$CLUSTER_PASS') multiple times."
 
+echo "Ensuring all nodes are powered on (Parallel Auto-Wake)..."
+for node in "${!CLUSTER_NODES[@]}"; do
+    sudo virsh start $node 2>/dev/null || true
+done
+
 for node in "${!CLUSTER_NODES[@]}"; do
     IP="${CLUSTER_NODES[$node]}"
+
+    echo "Waiting for $node ($IP) to boot and SSH to become available (max 3 minutes)..."
+    MAX_RETRIES=36
+    count=0
+    until sshpass -p "$CLUSTER_PASS" ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $CLUSTER_USER@$IP "echo 'ready'"; do
+        sleep 5
+        count=$((count+1))
+        if [ $count -ge $MAX_RETRIES ]; then
+            echo "Error: Timed out waiting for $node! The VM might not exist or is failing to boot."
+            exit 1
+        fi
+    done
+
     echo "Pushing key to $node ($IP)..."
     ssh-keygen -R "$IP" 2>/dev/null || true
     ssh-keygen -R "$node" 2>/dev/null || true
-    ssh-copy-id -i "$PUB_KEY" -o StrictHostKeyChecking=no $CLUSTER_USER@$IP || true
+    sshpass -p "$CLUSTER_PASS" ssh-copy-id -i "$PUB_KEY" -o StrictHostKeyChecking=no $CLUSTER_USER@$IP || true
 done
 
 echo "SSH key setup complete!"

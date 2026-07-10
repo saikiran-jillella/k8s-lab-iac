@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
 
 source libvirt/vm-specs.env
 NODES=("${!CLUSTER_NODES[@]}")

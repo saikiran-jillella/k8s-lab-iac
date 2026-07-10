@@ -1,8 +1,14 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
 
 source libvirt/vm-specs.env
 NODES=("${!CLUSTER_NODES[@]}")
+
+# shellcheck source=scripts/lib/ssh-agent-setup.sh
+source "$(dirname "$0")/lib/ssh-agent-setup.sh"
 
 BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"

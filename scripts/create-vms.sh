@@ -1,5 +1,8 @@
 #!/bin/bash
-set -eo pipefail
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
 
 source libvirt/vm-specs.env
 
@@ -115,8 +118,12 @@ for node in "${NODES[@]}"; do
         -e "s/{{GITHUB_SSH_USER}}/${GITHUB_SSH_USER:-}/g" \
         templates/cloud-init.yaml.template > .generated/cloud-init-$node.yaml
         
-    # Inject IP into Netplan
-    sed "s/{{IP_ADDRESS}}/$NODE_IP/g" templates/netplan.yaml.template > .generated/netplan-$node.yaml
+    # Inject IP and Routing into Netplan
+    sed -e "s/{{IP_ADDRESS}}/$NODE_IP/g" \
+        -e "s/{{CIDR_SUFFIX}}/${CIDR_SUFFIX:-24}/g" \
+        -e "s/{{GATEWAY_IP}}/${GATEWAY_IP:-192.168.0.1}/g" \
+        -e "s/{{NAMESERVERS}}/${NAMESERVERS:-1.1.1.1, 8.8.8.8}/g" \
+        templates/netplan.yaml.template > .generated/netplan-$node.yaml
 
     # Generate Kubernetes manifests if this is cp1
     if [[ "$node" == "cp1" ]]; then
@@ -145,6 +152,7 @@ for node in "${NODES[@]}"; do
         --network "${NETWORK_CONFIG}",model=virtio \
         --import \
         --noautoconsole \
+        --autostart \
         --graphics none
 
     echo "$node provisioned successfully."

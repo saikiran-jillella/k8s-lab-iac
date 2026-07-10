@@ -27,11 +27,11 @@ By default, the cluster is configured asymmetrically in `libvirt/vm-specs.env`:
 *   **CPU:** 18 vCPUs total (Control planes use 2 vCPUs, workers use 4 vCPUs).
 *   **RAM:** 18G total (Control planes use 2G, workers use 4G).
 *   **Storage:** 180G total (Control planes use 20G, workers use 40G).
-*   **Network:** Defaults to a host bridge (`br0`), but can be toggled to Libvirt's default NAT.
+*   **Network:** Defaults to Libvirt's isolated NAT network (`network=default`), but can be toggled to a host bridge (`br0`).
 
 ### How to Modify Defaults
 All hardware and network configurations are managed inside `libvirt/vm-specs.env`. 
-To change the resource allocation or network mode, simply edit the variables in that file before running the provisioning scripts. For example, to switch from a bridged network to NAT, change `NETWORK_CONFIG="bridge=br0"` to `NETWORK_CONFIG="network=default"`. Hardware allocations can be adjusted based on Node Pools (e.g., all workers) or overridden per-node in the same file.
+To change the resource allocation or network mode, simply edit the variables in that file before running the provisioning scripts. For example, to switch from the default isolated NAT to a bridged network, change `NETWORK_MODE="isolated"` to `NETWORK_MODE="bridged"`. Hardware allocations can be adjusted based on Node Pools (e.g., all workers) or overridden per-node in the same file.
 
 ---
 
@@ -43,6 +43,16 @@ To change the resource allocation or network mode, simply edit the variables in 
 | **`templates/`** | Base YAML templates for Cloud-Init and Netplan. These are dynamically compiled into `.generated/` during provisioning. |
 | **`kubeadm/`** | Kubernetes cluster configuration, Cilium values, and Kube-VIP manifests. |
 | **`scripts/`** | The core automation engine to drive the entire lifecycle. |
+
+---
+
+## Prerequisites
+
+Before running any scripts, you **must** have an SSH key pair generated on your host machine. The automation pipeline uses this key to securely communicate with the cluster nodes.
+If you do not have one, generate it first:
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/k8s_lab_ed25519
+```
 
 ---
 
@@ -89,6 +99,17 @@ Pulls the `kubeconfig` to your host and deploys the Prometheus Stack & Metrics S
 ```bash
 ./scripts/deploy-addons.sh
 ```
+
+---
+
+## Next Steps: Visual Cluster Management
+
+Once the cluster is running, it is highly recommended to use a visual IDE to manage your nodes, pods, and workloads instead of relying purely on the command line.
+
+*   **[OpenLens](https://github.com/MuhammedKalkan/OpenLens)**: The open-source, un-restricted version of Lens. Extremely powerful for real-time monitoring and log aggregation.
+*   **[Headlamp (Radar)](https://headlamp.dev/)**: A highly extensible, lightweight, and incredibly fast visual UI for Kubernetes.
+
+Simply point these tools to your newly generated `~/.kube/config` file and you will instantly see the entire cluster state!
 
 ---
 

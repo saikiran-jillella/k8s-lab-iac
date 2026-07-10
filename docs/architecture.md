@@ -8,6 +8,6 @@ This Kubernetes lab consists of 5 VMs running on KVM/QEMU:
 - **OS**: Ubuntu 26.04 Cloud Image (Jammy/Noble/Future) via `cloud-init`.
 - **Runtime**: containerd + crictl
 - **CNI**: Cilium 1.19.4 with Native Routing and kube-proxy replacement.
-- **Control Plane HA**: kube-vip configured as a static pod binding to 192.168.0.120.
+- **Control Plane HA**: kube-vip configured as a static pod binding to a VIP derived from the active subnet (e.g. `192.168.122.120` in isolated mode).
 
 All provisioning is driven by IaC without any manual configuration or `virt-manager` clicks.

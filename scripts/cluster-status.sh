@@ -1,7 +1,13 @@
 #!/bin/bash
+set -euo pipefail
+
+# Ensure execution context is always the project root
+cd "$(dirname "$0")/.."
+
 source libvirt/vm-specs.env
 
-set -e
+# shellcheck source=scripts/lib/ssh-agent-setup.sh
+source "$(dirname "$0")/lib/ssh-agent-setup.sh"
 
 echo "=== Cluster Nodes ==="
 ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl get nodes -o wide"
