@@ -126,10 +126,11 @@ for node in "${NODES[@]}"; do
         -e "s/{{NAMESERVERS}}/${NAMESERVERS:-1.1.1.1, 8.8.8.8}/g" \
         templates/netplan.yaml.template > .generated/netplan-$node.yaml
 
-    # Generate Kubernetes manifests if this is cp1
-    if [[ "$node" == "cp1" ]]; then
+    # Generate Kubernetes manifests if this is the primary control plane
+    if [[ "$node" == "$PRIMARY_CP" ]]; then
         sed -e "s/{{CP1_IP}}/$NODE_IP/g" \
             -e "s/{{CLUSTER_VIP}}/${CLUSTER_VIP:-$CLUSTER_VIP}/g" \
+            -e "s/{{PRIMARY_CP}}/$PRIMARY_CP/g" \
             templates/kubeadm-init.yaml.template > .generated/kubeadm-init.yaml
         sed -e "s/{{CLUSTER_VIP}}/${CLUSTER_VIP:-$CLUSTER_VIP}/g" \
             templates/kube-vip.yaml.template > .generated/kube-vip.yaml

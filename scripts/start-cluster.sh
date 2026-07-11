@@ -16,17 +16,17 @@ for node in "${NODES[@]}"; do
 done
 
 echo "Waiting for control plane to boot..."
-echo "Waiting for cp1 to boot and SSH to become available (max 3 minutes)..."
+echo "Waiting for $PRIMARY_CP to boot and SSH to become available (max 3 minutes)..."
 MAX_RETRIES=36
 count=0
-    until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
+    until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$PRIMARY_CP is up'"; do
         sleep 5
         count=$((count+1))
-        if [ $count -ge $MAX_RETRIES ]; then
-            echo "Error: Timed out waiting for cp1! Do the VMs exist?"
+        if (( count >= MAX_RETRIES )); then
+            echo "Error: Timed out waiting for $PRIMARY_CP! Do the VMs exist?"
             exit 1
         fi
     done
 
 echo "Cluster is awake! Fetching node status:"
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl get nodes"
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get nodes"

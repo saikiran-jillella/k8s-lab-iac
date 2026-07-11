@@ -30,10 +30,10 @@ if ! command -v helm &> /dev/null; then
 fi
 
 
-# 1. Always pull a fresh kubeconfig from cp1 (cluster may have been rebuilt)
+# 1. Always pull a fresh kubeconfig from $PRIMARY_CP (cluster may have been rebuilt)
 mkdir -p "$HOME/.kube"
-echo "Pulling kubeconfig from cp1 (${CLUSTER_NODES[cp1]})..."
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $CLUSTER_USER@${CLUSTER_NODES[cp1]}:~/.kube/config "$HOME/.kube/config" || {
+echo "Pulling kubeconfig from $PRIMARY_CP (${CLUSTER_NODES[$PRIMARY_CP]})..."
+scp $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]}:~/.kube/config "$HOME/.kube/config" || {
     echo "Failed to pull kubeconfig. Is the cluster running?"
     exit 1
 }

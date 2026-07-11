@@ -9,8 +9,6 @@ source libvirt/vm-specs.env
 # shellcheck source=scripts/lib/ssh-agent-setup.sh
 source "$(dirname "$0")/lib/ssh-agent-setup.sh"
 
-# SSH options to bypass host key changes from rapid VM rebuilds
-SSH_OPTS="-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=120"
 
 
 
@@ -31,43 +29,43 @@ until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
   fi
 done
 
-echo "[cp1] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
-    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo '$CLUSTER_PASS' | sudo -S bash -c '
+echo "[$PRIMARY_CP] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
+    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$CLUSTER_PASS' | sudo -S bash -c '
         while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
             line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\")
-            printf \"\e[2K\r[cp1] %s\" \"\$line\"
+            printf \"\e[2K\r[$PRIMARY_CP] %s\" \"\$line\"
             sleep 2
         done
         printf \"\n\"
     '" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
 
-    CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
+    CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
     if echo "$CI_STATUS" | grep -q "status: error"; then
-        if ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "which kubeadm" &>/dev/null; then
-            echo -e "\n[$(date +'%H:%M:%S')] [cp1] cloud-init finished with errors, but kubeadm is present. Proceeding."
+        if ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "which kubeadm" &>/dev/null; then
+            echo -e "\n[$(date +'%H:%M:%S')] [$PRIMARY_CP] cloud-init finished with errors, but kubeadm is present. Proceeding."
         else
-            echo "[cp1] FATAL: kubeadm was NOT installed. Cloud-init runcmd failed."
+            echo "[$PRIMARY_CP] FATAL: kubeadm was NOT installed. Cloud-init runcmd failed."
             exit 1
         fi
     elif ! echo "$CI_STATUS" | grep -q "status: done"; then
-        echo "[cp1] Error: Timed out or failed waiting for cloud-init after 60 minutes! Status: $CI_STATUS"
+        echo "[$PRIMARY_CP] Error: Timed out or failed waiting for cloud-init after 60 minutes! Status: $CI_STATUS"
         exit 1
     else
-        echo -e "\n[$(date +'%H:%M:%S')] [cp1] cloud-init provisioning complete!"
+        echo -e "\n[$(date +'%H:%M:%S')] [$PRIMARY_CP] cloud-init provisioning complete!"
     fi
 
-echo "Copying kubeadm configs to cp1..."
-scp $SSH_OPTS .generated/kubeadm-init.yaml $CLUSTER_USER@${CLUSTER_NODES[cp1]}:/tmp/
-scp $SSH_OPTS .generated/kube-vip.yaml $CLUSTER_USER@${CLUSTER_NODES[cp1]}:/tmp/
-scp $SSH_OPTS .generated/cilium-values.yaml $CLUSTER_USER@${CLUSTER_NODES[cp1]}:/tmp/
+echo "Copying kubeadm configs to $PRIMARY_CP..."
+scp $SSH_OPTS .generated/kubeadm-init.yaml $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]}:/tmp/
+scp $SSH_OPTS .generated/kube-vip.yaml $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]}:/tmp/
+scp $SSH_OPTS .generated/cilium-values.yaml $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]}:/tmp/
 
-echo "Initializing cluster on cp1..."
-ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} << EOF
+echo "Initializing cluster on $PRIMARY_CP..."
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} << EOF
   set -e
   if [ ! -f /etc/kubernetes/admin.conf ]; then
     echo "$CLUSTER_PASS" | sudo -S kubeadm init --config /tmp/kubeadm-init.yaml --upload-certs | tee /tmp/kubeadm-init.out
   else
-    echo "cp1 already initialized."
+    echo "$PRIMARY_CP already initialized."
   fi
   
   # Set up kubectl for the regular user
@@ -75,7 +73,7 @@ ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} << EOF
   echo "$CLUSTER_PASS" | sudo -S cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config
   echo "$CLUSTER_PASS" | sudo -S chown \$(id -u):\$(id -g) \$HOME/.kube/config
 
-  echo "Deploying kube-vip to cp1..."
+  echo "Deploying kube-vip to $PRIMARY_CP..."
   INTERFACE=\$(ip route ls default | awk '{print \$5}' | head -n 1)
   sed -i "s/{{VIP_INTERFACE}}/\$INTERFACE/g" /tmp/kube-vip.yaml
   echo "$CLUSTER_PASS" | sudo -S cp /tmp/kube-vip.yaml /etc/kubernetes/manifests/
@@ -104,9 +102,9 @@ ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} << EOF
   fi
 EOF
 
-echo "Retrieving join commands from cp1..."
-CP_JOIN_CMD=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'saikiran' | sudo -S kubeadm token create --print-join-command 2>/dev/null" | tail -1)
-CERT_KEY=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'saikiran' | sudo -S kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1")
+echo "Retrieving join commands from $PRIMARY_CP..."
+CP_JOIN_CMD=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$CLUSTER_PASS' | sudo -S kubeadm token create --print-join-command 2>/dev/null" | tail -1)
+CERT_KEY=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$CLUSTER_PASS' | sudo -S kubeadm init phase upload-certs --upload-certs 2>/dev/null | tail -1")
 
 echo "Generated CP join command: $CP_JOIN_CMD --control-plane --certificate-key $CERT_KEY"
 echo "Generated Worker join command: $CP_JOIN_CMD"
@@ -118,7 +116,7 @@ echo "WORKER_JOIN_CMD=\"$CP_JOIN_CMD\"" >> .generated/join-template.sh
 
 for node in "${!CLUSTER_NODES[@]}"; do
     IP="${CLUSTER_NODES[$node]}"
-    if [[ "$node" == "cp1" ]]; then
+    if [[ "$node" == "$PRIMARY_CP" ]]; then
         continue # Already initialized above
     fi
 
@@ -173,7 +171,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
         ssh $SSH_OPTS $CLUSTER_USER@$IP "if [ ! -f /etc/kubernetes/kubelet.conf ]; then echo '$CLUSTER_PASS' | sudo -S $CP_JOIN_CMD; else echo 'Already joined'; fi"
         
         echo "Labeling $node as worker..."
-        ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl label node $node node-role.kubernetes.io/worker=worker --overwrite"
+        ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl label node $node node-role.kubernetes.io/worker=worker --overwrite"
     else
         echo "Warning: Node $node does not start with 'cp' or 'worker'. Skipping join..."
     fi
@@ -185,9 +183,9 @@ for node in "${!CLUSTER_NODES[@]}"; do
     echo "-> NOTE: This may take 20-30 minutes while Cilium images download from quay.io."
     echo "-> DO NOT press Ctrl+C. The script will show you live pod progress below:"
     
-    while ! ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl get node $node 2>/dev/null | grep -w 'Ready'" >/dev/null 2>&1; do
+    while ! ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get node $node 2>/dev/null | grep -w 'Ready'" >/dev/null 2>&1; do
         echo -e "\n[$(date +'%H:%M:%S')] Node $node is not yet Ready. Live cluster status:"
-        ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl get pods -n kube-system" 2>/dev/null
+        ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get pods -n kube-system" 2>/dev/null
         echo -e "\nWaiting 30 seconds before next check..."
         sleep 30
     done

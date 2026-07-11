@@ -5,6 +5,9 @@
 
 LAB_KEY="$HOME/.ssh/k8s_lab_ed25519"
 
+# Standardize SSH options to suppress warnings, speed up connection timeouts, and prevent disconnects
+export SSH_OPTS="-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=120"
+
 if [[ ! -f "$LAB_KEY" ]]; then
     echo
     echo "Lab SSH key not found:"

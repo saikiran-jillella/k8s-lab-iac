@@ -18,16 +18,16 @@ for node in "${NODES[@]}"; do
     sudo virsh dumpxml "$node" > "$BACKUP_DIR/$node.xml" || true
 done
 
-echo "Collecting network info from cp1..."
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "ip addr" > "$BACKUP_DIR/cp1_ip_addr.txt"
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "ip route" > "$BACKUP_DIR/cp1_ip_route.txt"
+echo "Collecting network info from $PRIMARY_CP..."
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "ip addr" > "$BACKUP_DIR/${PRIMARY_CP}_ip_addr.txt"
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "ip route" > "$BACKUP_DIR/${PRIMARY_CP}_ip_route.txt"
 
 echo "Collecting cluster info..."
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl version" > "$BACKUP_DIR/kubectl_version.txt" || true
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "kubectl get nodes -o wide" > "$BACKUP_DIR/kubectl_nodes.txt" || true
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cilium status" > "$BACKUP_DIR/cilium_status.txt" || true
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo "$CLUSTER_PASS" | sudo -S crictl version 2>/dev/null" > "$BACKUP_DIR/crictl_version.txt" || true
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo "$CLUSTER_PASS" | sudo -S kubeadm version 2>/dev/null" > "$BACKUP_DIR/kubeadm_version.txt" || true
-ssh -o StrictHostKeyChecking=no $CLUSTER_USER@${CLUSTER_NODES[cp1]} "containerd --version" > "$BACKUP_DIR/containerd_version.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl version" > "$BACKUP_DIR/kubectl_version.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get nodes -o wide" > "$BACKUP_DIR/kubectl_nodes.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "cilium status" > "$BACKUP_DIR/cilium_status.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo \"$CLUSTER_PASS\" | sudo -S crictl version 2>/dev/null" > "$BACKUP_DIR/crictl_version.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo \"$CLUSTER_PASS\" | sudo -S kubeadm version 2>/dev/null" > "$BACKUP_DIR/kubeadm_version.txt" || true
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "containerd --version" > "$BACKUP_DIR/containerd_version.txt" || true
 
 echo "Diagnostics collected in $BACKUP_DIR"
