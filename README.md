@@ -41,7 +41,7 @@ To change the resource allocation or network mode, simply edit the variables in 
 | --- | --- |
 | **`libvirt/`** | Contains `vm-specs.env` (The **Single Source of Truth** for IP addressing and hardware sizing). |
 | **`templates/`** | Base YAML templates for Cloud-Init and Netplan. These are dynamically compiled into `.generated/` during provisioning. |
-| **`kubeadm/`** | Kubernetes cluster configuration, Cilium values, and Kube-VIP manifests. |
+
 | **`scripts/`** | The core automation engine to drive the entire lifecycle. |
 
 ---
