@@ -20,28 +20,42 @@ echo "You may be prompted for the node password ('$CLUSTER_PASS') multiple times
 
 echo "Ensuring all nodes are powered on (Parallel Auto-Wake)..."
 for node in "${!CLUSTER_NODES[@]}"; do
-    sudo virsh start $node 2>/dev/null || true
+    sudo virsh start "$node" 2>/dev/null || true
 done
 
 for node in "${!CLUSTER_NODES[@]}"; do
     IP="${CLUSTER_NODES[$node]}"
 
     echo "Waiting for $node ($IP) to boot and SSH to become available (max 3 minutes)..."
+
     MAX_RETRIES=36
     count=0
-    until sshpass -p "$CLUSTER_PASS" ssh -o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $CLUSTER_USER@$IP "echo 'ready'"; do
+
+    until sshpass -p "$CLUSTER_PASS" ssh \
+        -o ConnectTimeout=5 \
+        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=no \
+        "$CLUSTER_USER@$IP" \
+        "echo ready" >/dev/null 2>&1
+    do
         sleep 5
-        count=$((count+1))
-        if [ $count -ge $MAX_RETRIES ]; then
+        count=$((count + 1))
+
+        if (( count >= MAX_RETRIES )); then
             echo "Error: Timed out waiting for $node! The VM might not exist or is failing to boot."
             exit 1
         fi
     done
 
     echo "Pushing key to $node ($IP)..."
-    ssh-keygen -R "$IP" 2>/dev/null || true
-    ssh-keygen -R "$node" 2>/dev/null || true
-    sshpass -p "$CLUSTER_PASS" ssh-copy-id -i "$PUB_KEY" -o StrictHostKeyChecking=no $CLUSTER_USER@$IP || true
+
+    ssh-keygen -R "$IP" >/dev/null 2>&1 || true
+    ssh-keygen -R "$node" >/dev/null 2>&1 || true
+
+    sshpass -p "$CLUSTER_PASS" ssh-copy-id \
+        -i "$PUB_KEY" \
+        -o StrictHostKeyChecking=no \
+        "$CLUSTER_USER@$IP" || true
 done
 
 echo "SSH key setup complete!"

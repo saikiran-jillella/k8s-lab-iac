@@ -1,4 +1,5 @@
 routingMode: native
+autoDirectNodeRoutes: true
 kubeProxyReplacement: true
 ipv4NativeRoutingCIDR: "10.244.0.0/16"
 k8sServiceHost: "{{CLUSTER_VIP}}"
