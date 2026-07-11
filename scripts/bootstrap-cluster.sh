@@ -60,7 +60,7 @@ scp $SSH_OPTS .generated/kube-vip.yaml $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP
 scp $SSH_OPTS .generated/cilium-values.yaml $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]}:/tmp/
 
 echo "Initializing cluster on $PRIMARY_CP..."
-ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} << EOF
+ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} << EOF | sed -u "s/^/[$PRIMARY_CP] /"
   set -e
   if [ ! -f /etc/kubernetes/admin.conf ]; then
     echo "$CLUSTER_PASS" | sudo -S kubeadm init --config /tmp/kubeadm-init.yaml --upload-certs | tee /tmp/kubeadm-init.out
@@ -160,7 +160,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
 
     if [[ "$node" == cp* ]]; then
         echo "Joining $node as Control Plane..."
-        ssh $SSH_OPTS $CLUSTER_USER@$IP "if [ ! -f /etc/kubernetes/kubelet.conf ]; then echo '$CLUSTER_PASS' | sudo -S $CP_JOIN_CMD --control-plane --certificate-key $CERT_KEY; else echo 'Already joined'; fi"
+        ssh $SSH_OPTS $CLUSTER_USER@$IP "if [ ! -f /etc/kubernetes/kubelet.conf ]; then echo '$CLUSTER_PASS' | sudo -S $CP_JOIN_CMD --control-plane --certificate-key $CERT_KEY; else echo 'Already joined'; fi" | sed -u "s/^/[$node] /"
         
         echo "Deploying kube-vip to $node..."
         scp $SSH_OPTS .generated/kube-vip.yaml $CLUSTER_USER@$IP:/tmp/ 2>/dev/null
@@ -168,7 +168,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
     
     elif [[ "$node" == worker* ]]; then
         echo "Joining $node as Worker..."
-        ssh $SSH_OPTS $CLUSTER_USER@$IP "if [ ! -f /etc/kubernetes/kubelet.conf ]; then echo '$CLUSTER_PASS' | sudo -S $CP_JOIN_CMD; else echo 'Already joined'; fi"
+        ssh $SSH_OPTS $CLUSTER_USER@$IP "if [ ! -f /etc/kubernetes/kubelet.conf ]; then echo '$CLUSTER_PASS' | sudo -S $CP_JOIN_CMD; else echo 'Already joined'; fi" | sed -u "s/^/[$node] /"
         
         echo "Labeling $node as worker..."
         ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl label node $node node-role.kubernetes.io/worker=worker --overwrite"
