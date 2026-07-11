@@ -3,7 +3,9 @@ network:
   ethernets:
     default_interface:
       match:
-        driver: virtio_net
+        name: "en*"
+      optional: true
+      link-local: []
       dhcp4: false
       dhcp6: false
       addresses:

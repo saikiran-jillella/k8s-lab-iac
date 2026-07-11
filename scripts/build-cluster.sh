@@ -1,6 +1,9 @@
 #!/bin/bash
 set -u
 
+# Trap Ctrl+C (SIGINT) to forcefully break out of any running wait loops
+trap 'echo -e "\nAborted by user (Ctrl+C)"; exit 130' INT
+
 # Ensure execution context is always the project root
 cd "$(dirname "$0")/.."
 

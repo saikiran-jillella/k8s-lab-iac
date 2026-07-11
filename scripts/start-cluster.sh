@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Trap Ctrl+C (SIGINT) to forcefully break out of any running wait loops
+trap 'echo -e "\nAborted by user (Ctrl+C)"; exit 130' INT
+
 # Ensure execution context is always the project root
 cd "$(dirname "$0")/.."
 
@@ -16,8 +19,8 @@ for node in "${NODES[@]}"; do
 done
 
 echo "Waiting for control plane to boot..."
-echo "Waiting for $PRIMARY_CP to boot and SSH to become available (max 3 minutes)..."
-MAX_RETRIES=36
+echo "Waiting for $PRIMARY_CP to boot and SSH to become available (max 10 minutes)..."
+MAX_RETRIES=120
 count=0
     until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$PRIMARY_CP is up'"; do
         sleep 5

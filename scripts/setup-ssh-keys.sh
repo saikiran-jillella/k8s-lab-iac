@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Trap Ctrl+C (SIGINT) to forcefully break out of any running wait loops
+trap 'echo -e "\nAborted by user (Ctrl+C)"; exit 130' INT
+
 # Ensure execution context is always the project root
 cd "$(dirname "$0")/.."
 
@@ -26,9 +29,9 @@ done
 for node in "${!CLUSTER_NODES[@]}"; do
     IP="${CLUSTER_NODES[$node]}"
 
-    echo "[$node] Waiting for VM ($IP) to boot and SSH to become available (max 3 minutes)..."
+    echo "[$node] Waiting for VM ($IP) to boot and SSH to become available (max 10 minutes)..."
 
-    MAX_RETRIES=36
+    MAX_RETRIES=120
     count=0
 
     until sshpass -p "$CLUSTER_PASS" ssh \

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -u  # Catch unset variables, but do NOT use -e/-o pipefail (SSH calls to booting VMs return non-zero transiently)
 
+# Trap Ctrl+C (SIGINT) to forcefully break out of any running wait loops
+trap 'echo -e "\nAborted by user (Ctrl+C)"; exit 130' INT
+
 # Ensure execution context is always the project root
 cd "$(dirname "$0")/.."
 
@@ -17,19 +20,19 @@ for node in "${!CLUSTER_NODES[@]}"; do
     sudo virsh start $node 2>/dev/null || true
 done
 
-echo "Waiting for cp1 to be SSH accessible (max 3 minutes)..."
-MAX_RETRIES=36
+echo "Waiting for $PRIMARY_CP to be SSH accessible (max 10 minutes)..."
+MAX_RETRIES=120
 count=0
-until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
+until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$PRIMARY_CP is up'"; do
   sleep 5
   count=$((count+1))
   if [ $count -ge $MAX_RETRIES ]; then
-      echo "Error: Timed out waiting for cp1! Did you run setup-ssh-keys.sh? Do the VMs exist?"
+      echo "Error: Timed out waiting for $PRIMARY_CP! Did you run setup-ssh-keys.sh? Do the VMs exist?"
       exit 1
   fi
 done
 
-echo "[$PRIMARY_CP] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
+echo "[$PRIMARY_CP] Waiting for cloud-init to finish installing Kubernetes..."
     timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "echo '$CLUSTER_PASS' | sudo -S bash -c '
         while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
             line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\")
@@ -37,7 +40,7 @@ echo "[$PRIMARY_CP] Waiting for cloud-init to finish installing Kubernetes (this
             sleep 2
         done
         printf \"\n\"
-    '" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+    '" || { EXIT_CODE=$?; if [ $EXIT_CODE -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; else exit $EXIT_CODE; fi; }
 
     CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
     if echo "$CI_STATUS" | grep -q "status: error"; then
@@ -121,8 +124,8 @@ for node in "${!CLUSTER_NODES[@]}"; do
     fi
 
 
-    echo "[$node] Waiting for SSH to become available (max 3 minutes)..."
-    MAX_RETRIES=36
+    echo "[$node] Waiting for SSH to become available (max 10 minutes)..."
+    MAX_RETRIES=120
     count=0
     until ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$node is up'"; do
         sleep 5
@@ -133,7 +136,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
         fi
     done
     
-    echo "[$node] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
+    echo "[$node] Waiting for cloud-init to finish installing Kubernetes..."
         timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$CLUSTER_PASS' | sudo -S bash -c '
             while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
                 line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\")
@@ -141,7 +144,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
                 sleep 2
             done
             printf \"\n\"
-        '" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+        '" || { EXIT_CODE=$?; if [ $EXIT_CODE -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; else exit $EXIT_CODE; fi; }
 
         CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@$IP "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
         if echo "$CI_STATUS" | grep -q "status: error"; then
