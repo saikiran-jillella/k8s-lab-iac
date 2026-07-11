@@ -32,14 +32,14 @@ until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
 done
 
 echo "Waiting for cloud-init to finish installing Kubernetes on cp1 (this may take up to 60 minutes)..."
-    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "
-        while ! cloud-init status 2>/dev/null | grep -Eq '(status: done|status: error)'; do
-            line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc '[:print:]' | cut -c 1-80)
-            printf '\r%-80s\r> %s' ' ' \"\$line\"
+    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo '$CLUSTER_PASS' | sudo -S bash -c '
+        while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
+            line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\" | cut -c 1-80)
+            printf \"\r%-80s\r> %s\" \" \" \"\$line\"
             sleep 2
         done
-        printf '\n'
-    " || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+        printf \"\n\"
+    '" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
 
     CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
     if echo "$CI_STATUS" | grep -q "status: error"; then
@@ -136,14 +136,14 @@ for node in "${!CLUSTER_NODES[@]}"; do
     done
     
     echo "Waiting for cloud-init to finish installing Kubernetes on $node (this may take up to 60 minutes)..."
-        timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "
-            while ! cloud-init status 2>/dev/null | grep -Eq '(status: done|status: error)'; do
-                line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc '[:print:]' | cut -c 1-80)
-                printf '\r%-80s\r> %s' ' ' \"\$line\"
+        timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$CLUSTER_PASS' | sudo -S bash -c '
+            while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
+                line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\" | cut -c 1-80)
+                printf \"\r%-80s\r> %s\" \" \" \"\$line\"
                 sleep 2
             done
-            printf '\n'
-        " || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+            printf \"\n\"
+        '" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
 
         CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@$IP "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
         if echo "$CI_STATUS" | grep -q "status: error"; then
