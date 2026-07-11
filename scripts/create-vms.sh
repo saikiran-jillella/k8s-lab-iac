@@ -71,7 +71,7 @@ if [ ! -f "$IMAGE_FILE" ]; then
 fi
 
 for node in "${NODES[@]}"; do
-    echo "Provisioning $node..."
+    echo "[$node] Provisioning..."
     
     DISK_PATH="$VM_DIR/$node.qcow2"
     SEED_PATH="$VM_DIR/$node-seed.iso"
@@ -105,8 +105,9 @@ for node in "${NODES[@]}"; do
     NODE_IP=${CLUSTER_NODES[$node]}
 
     # Create the VM disk from the base image
+    echo "[$node] Preparing disk image ($NODE_DISK_SIZE)..."
     sudo cp "$IMAGE_FILE" "$DISK_PATH"
-    sudo qemu-img resize "$DISK_PATH" "$NODE_DISK_SIZE"
+    sudo qemu-img resize "$DISK_PATH" "$NODE_DISK_SIZE" >/dev/null 2>&1
 
     # Generate Node-Specific Configs from Templates
     mkdir -p .generated
@@ -137,11 +138,11 @@ for node in "${NODES[@]}"; do
     fi
 
     # Create the cloud-init seed ISO
-    echo "Generating cloud-init seed for $node..."
+    echo "[$node] Generating cloud-init seed..."
     sudo cloud-localds --network-config .generated/netplan-$node.yaml "$SEED_PATH" .generated/cloud-init-$node.yaml
 
     # Create the VM using virt-install
-    echo "Creating VM $node with virt-install (VCPUS: $NODE_VCPU, RAM: ${NODE_RAM_SIZE}MB, Disk: $NODE_DISK_SIZE)..."
+    echo "[$node] Creating VM with virt-install (VCPUS: $NODE_VCPU, RAM: ${NODE_RAM_SIZE}MB, Disk: $NODE_DISK_SIZE)..."
     sudo virt-install \
         --name "$node" \
         --memory "$NODE_RAM_SIZE" \
@@ -155,7 +156,7 @@ for node in "${NODES[@]}"; do
         --autostart \
         --graphics none
 
-    echo "$node provisioned successfully."
+    echo "[$node] Provisioned successfully."
 done
 
 echo "All VMs created and started. Because we used the golden image, they will be ready in seconds."

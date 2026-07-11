@@ -31,11 +31,11 @@ until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
   fi
 done
 
-echo "Waiting for cloud-init to finish installing Kubernetes on cp1 (this may take up to 60 minutes)..."
+echo "[cp1] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
     timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo '$CLUSTER_PASS' | sudo -S bash -c '
         while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
-            line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\" | cut -c 1-80)
-            printf \"\r%-80s\r> %s\" \" \" \"\$line\"
+            line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\")
+            printf \"\e[2K\r[cp1] %s\" \"\$line\"
             sleep 2
         done
         printf \"\n\"
@@ -44,16 +44,16 @@ echo "Waiting for cloud-init to finish installing Kubernetes on cp1 (this may ta
     CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
     if echo "$CI_STATUS" | grep -q "status: error"; then
         if ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "which kubeadm" &>/dev/null; then
-            echo -e "\n[$(date +'%H:%M:%S')] cloud-init finished with errors, but kubeadm is present. Proceeding."
+            echo -e "\n[$(date +'%H:%M:%S')] [cp1] cloud-init finished with errors, but kubeadm is present. Proceeding."
         else
-            echo "FATAL: kubeadm was NOT installed. Cloud-init runcmd failed."
+            echo "[cp1] FATAL: kubeadm was NOT installed. Cloud-init runcmd failed."
             exit 1
         fi
     elif ! echo "$CI_STATUS" | grep -q "status: done"; then
-        echo "Error: Timed out or failed waiting for cloud-init after 60 minutes! Status: $CI_STATUS"
+        echo "[cp1] Error: Timed out or failed waiting for cloud-init after 60 minutes! Status: $CI_STATUS"
         exit 1
     else
-        echo -e "\n[$(date +'%H:%M:%S')] cloud-init provisioning complete!"
+        echo -e "\n[$(date +'%H:%M:%S')] [cp1] cloud-init provisioning complete!"
     fi
 
 echo "Copying kubeadm configs to cp1..."
@@ -123,23 +123,23 @@ for node in "${!CLUSTER_NODES[@]}"; do
     fi
 
 
-    echo "Waiting for $node ($IP) to be SSH accessible (max 3 minutes)..."
+    echo "[$node] Waiting for SSH to become available (max 3 minutes)..."
     MAX_RETRIES=36
     count=0
     until ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$node is up'"; do
         sleep 5
         count=$((count+1))
         if [ $count -ge $MAX_RETRIES ]; then
-            echo "Error: Timed out waiting for $node! Did you run setup-ssh-keys.sh? Do the VMs exist?"
+            echo "[$node] Error: Timed out waiting for SSH! Did you run setup-ssh-keys.sh? Do the VMs exist?"
             exit 1
         fi
     done
     
-    echo "Waiting for cloud-init to finish installing Kubernetes on $node (this may take up to 60 minutes)..."
+    echo "[$node] Waiting for cloud-init to finish installing Kubernetes (this may take up to 60 minutes)..."
         timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$CLUSTER_PASS' | sudo -S bash -c '
             while ! cloud-init status 2>/dev/null | grep -Eq \"(status: done|status: error)\"; do
-                line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\" | cut -c 1-80)
-                printf \"\r%-80s\r> %s\" \" \" \"\$line\"
+                line=\$(tail -n 1 /var/log/cloud-init-output.log 2>/dev/null | tr -dc \"[:print:]\")
+                printf \"\e[2K\r[$node] %s\" \"\$line\"
                 sleep 2
             done
             printf \"\n\"
@@ -148,16 +148,16 @@ for node in "${!CLUSTER_NODES[@]}"; do
         CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@$IP "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
         if echo "$CI_STATUS" | grep -q "status: error"; then
             if ssh $SSH_OPTS $CLUSTER_USER@$IP "which kubeadm" &>/dev/null; then
-                echo -e "\n[$(date +'%H:%M:%S')] cloud-init finished with errors on $node. kubeadm is present. Proceeding."
+                echo -e "\n[$(date +'%H:%M:%S')] [$node] cloud-init finished with errors. kubeadm is present. Proceeding."
             else
-                echo "FATAL: kubeadm was NOT installed on $node. Cloud-init runcmd failed."
+                echo "[$node] FATAL: kubeadm was NOT installed. Cloud-init runcmd failed."
                 exit 1
             fi
         elif ! echo "$CI_STATUS" | grep -q "status: done"; then
-            echo "Error: Timed out waiting for cloud-init on $node! Status: $CI_STATUS"
+            echo "[$node] Error: Timed out waiting for cloud-init! Status: $CI_STATUS"
             exit 1
         else
-            echo -e "\n[$(date +'%H:%M:%S')] cloud-init provisioning complete on $node!"
+            echo -e "\n[$(date +'%H:%M:%S')] [$node] cloud-init provisioning complete!"
         fi
 
     if [[ "$node" == cp* ]]; then
