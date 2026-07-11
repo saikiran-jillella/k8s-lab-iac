@@ -10,7 +10,7 @@ source libvirt/vm-specs.env
 source "$(dirname "$0")/lib/ssh-agent-setup.sh"
 
 # SSH options to bypass host key changes from rapid VM rebuilds
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=120"
+SSH_OPTS="-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=120"
 
 
 
@@ -32,7 +32,7 @@ until ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo 'cp1 is up'"; do
 done
 
 echo "Waiting for cloud-init to finish installing Kubernetes on cp1 (this may take up to 60 minutes)..."
-    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "echo '$CLUSTER_PASS' | sudo -S bash -c 'tail -f /var/log/cloud-init-output.log & TAIL_PID=\$!; cloud-init status --wait >/dev/null 2>&1; kill \$TAIL_PID 2>/dev/null'" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+    timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cloud-init status --wait >/dev/null 2>&1" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
 
     CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[cp1]} "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
     if echo "$CI_STATUS" | grep -q "status: error"; then
@@ -129,7 +129,7 @@ for node in "${!CLUSTER_NODES[@]}"; do
     done
     
     echo "Waiting for cloud-init to finish installing Kubernetes on $node (this may take up to 60 minutes)..."
-        timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "echo '$CLUSTER_PASS' | sudo -S bash -c 'tail -f /var/log/cloud-init-output.log & TAIL_PID=\$!; cloud-init status --wait >/dev/null 2>&1; kill \$TAIL_PID 2>/dev/null'" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
+        timeout 3600 ssh $SSH_OPTS $CLUSTER_USER@$IP "cloud-init status --wait >/dev/null 2>&1" || { if [ $? -eq 130 ]; then echo -e "\nAborted by user (Ctrl+C)"; exit 130; fi; }
 
         CI_STATUS=$(ssh $SSH_OPTS $CLUSTER_USER@$IP "cloud-init status 2>/dev/null" 2>/dev/null || echo "status: error")
         if echo "$CI_STATUS" | grep -q "status: error"; then

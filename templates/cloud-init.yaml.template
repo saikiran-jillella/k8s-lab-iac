@@ -60,6 +60,11 @@ runcmd:
   - sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
   - systemctl restart containerd
   - systemctl enable containerd
+  
+  # Suppress Ubuntu SSH login banner for cleaner script outputs
+  - touch /home/{{CLUSTER_USER}}/.hushlogin
+  - chown {{CLUSTER_USER}}:{{CLUSTER_USER}} /home/{{CLUSTER_USER}}/.hushlogin
+
   # Install Kubernetes latest
   - mkdir -p -m 755 /etc/apt/keyrings
   - curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
