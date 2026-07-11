@@ -145,6 +145,7 @@ for node in "${NODES[@]}"; do
     # Create the VM using virt-install
     echo "[$node] Creating VM with virt-install (VCPUS: $NODE_VCPU, RAM: ${NODE_RAM_SIZE}MB, Disk: $NODE_DISK_SIZE)..."
     sudo virt-install \
+        --quiet \
         --name "$node" \
         --memory "$NODE_RAM_SIZE" \
         --vcpus "$NODE_VCPU" \
@@ -158,6 +159,7 @@ for node in "${NODES[@]}"; do
         --graphics none
 
     echo "[$node] Provisioned successfully."
+    echo ""
 done
 
 echo "All VMs created and started. Because we used the golden image, they will be ready in seconds."
