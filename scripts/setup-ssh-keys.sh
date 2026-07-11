@@ -26,7 +26,7 @@ done
 for node in "${!CLUSTER_NODES[@]}"; do
     IP="${CLUSTER_NODES[$node]}"
 
-    echo "Waiting for $node ($IP) to boot and SSH to become available (max 3 minutes)..."
+    echo "[$node] Waiting for VM ($IP) to boot and SSH to become available (max 3 minutes)..."
 
     MAX_RETRIES=36
     count=0
@@ -42,12 +42,12 @@ for node in "${!CLUSTER_NODES[@]}"; do
         count=$((count + 1))
 
         if (( count >= MAX_RETRIES )); then
-            echo "Error: Timed out waiting for $node! The VM might not exist or is failing to boot."
+            echo "[$node] Error: Timed out! The VM might not exist or is failing to boot."
             exit 1
         fi
     done
 
-    echo "Pushing key to $node ($IP)..."
+    echo "[$node] Pushing SSH key..."
 
     ssh-keygen -R "$IP" >/dev/null 2>&1 || true
     ssh-keygen -R "$node" >/dev/null 2>&1 || true
@@ -55,7 +55,10 @@ for node in "${!CLUSTER_NODES[@]}"; do
     sshpass -p "$CLUSTER_PASS" ssh-copy-id \
         -i "$PUB_KEY" \
         -o StrictHostKeyChecking=no \
-        "$CLUSTER_USER@$IP" || true
+        "$CLUSTER_USER@$IP" >/dev/null 2>&1 || true
+
+    echo "[$node] Key successfully installed."
+    echo ""
 done
 
 echo "SSH key setup complete!"
