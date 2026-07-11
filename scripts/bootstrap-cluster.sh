@@ -183,13 +183,30 @@ for node in "${!CLUSTER_NODES[@]}"; do
     echo "-> NOTE: This may take 20-30 minutes while Cilium images download from quay.io."
     echo "-> DO NOT press Ctrl+C. The script will show you live pod progress below:"
     
+    clear_lines=0
     while ! ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get node $node 2>/dev/null | grep -w 'Ready'" >/dev/null 2>&1; do
-        echo -e "\n[$(date +'%H:%M:%S')] Node $node is not yet Ready. Live cluster status:"
-        ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get pods -n kube-system" 2>/dev/null
-        echo -e "\nWaiting 30 seconds before next check..."
+        POD_OUTPUT=$(ssh $SSH_OPTS $CLUSTER_USER@${CLUSTER_NODES[$PRIMARY_CP]} "kubectl get pods -n kube-system" 2>/dev/null || echo "Failed to fetch pods")
+        
+        if [ $clear_lines -gt 0 ]; then
+            printf "\033[%dA\033[J" "$clear_lines"
+        fi
+        
+        echo "[$node] [$(date +'%H:%M:%S')] Node is not yet Ready. Live cluster status:"
+        echo "$POD_OUTPUT"
+        echo "[$node] Waiting 30 seconds before next check..."
+        
+        out_lines=$(echo "$POD_OUTPUT" | wc -l)
+        # Header (1) + Output (out_lines) + Footer (1)
+        clear_lines=$(( 1 + out_lines + 1 ))
+        
         sleep 30
     done
-    echo "Node $node is now Ready!"
+    
+    # Clear the block one final time when it's ready
+    if [ $clear_lines -gt 0 ]; then
+        printf "\033[%dA\033[J" "$clear_lines"
+    fi
+    echo "[$node] Node is now Ready!"
 done
 
 echo "Cluster bootstrapping complete."
