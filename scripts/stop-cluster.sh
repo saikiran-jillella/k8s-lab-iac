@@ -8,6 +8,6 @@ source libvirt/vm-specs.env
 NODES=("${!CLUSTER_NODES[@]}")
 
 for node in "${NODES[@]}"; do
-    echo "Shutting down $node..."
-    sudo virsh shutdown "$node" || true
+    echo "[$node] Shutting down VM..."
+    sudo virsh shutdown "$node" >/dev/null 2>&1 || true
 done
